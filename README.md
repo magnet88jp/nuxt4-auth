@@ -30,6 +30,8 @@ npx ampx generate outputs -o public/amplify_outputs.json
 
 The command above creates `public/amplify_outputs.json`, which the client-side plugin loads at runtime. Re-run it after backend changes.
 
+> Cognito サインインを有効化するには、`amplify push` 後に Amplify Console や AWS CLI でユーザーを作成し、メールの検証を完了してください。アプリ起動後にその資格情報でログインすると、本人の Todo を DynamoDB に保存できます。
+
 ## Development Server
 
 Start the development server on `http://localhost:3000`:
