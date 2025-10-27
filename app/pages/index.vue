@@ -1,15 +1,28 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 
-const { user, isAuthenticated, loading: authLoading, error: authError, login, logout } = useAuth()
+const {
+  user,
+  isAuthenticated,
+  loading: authLoading,
+  error: authError,
+  challenge,
+  login,
+  logout,
+  completeNewPassword,
+} = useAuth()
 const { todos, loading, error, fetchTodos, addTodo, toggleTodo, deleteTodo } = useTodos()
 
 const newTodo = ref('')
 const email = ref('')
 const password = ref('')
+const newPassword = ref('')
+const newPasswordConfirm = ref('')
+const newPasswordError = ref<string | null>(null)
 
 const hasTodos = computed(() => todos.value.length > 0)
 const currentUser = computed(() => user.value)
+const requiresNewPassword = computed(() => challenge.value === 'NEW_PASSWORD_REQUIRED')
 
 watch(
   () => isAuthenticated.value,
@@ -21,6 +34,17 @@ watch(
     }
   },
   { immediate: true }
+)
+
+watch(
+  () => requiresNewPassword.value,
+  (active) => {
+    if (!active) {
+      newPassword.value = ''
+      newPasswordConfirm.value = ''
+      newPasswordError.value = null
+    }
+  }
 )
 
 const handleSubmit = async () => {
@@ -69,6 +93,21 @@ const handleLogout = async () => {
     // エラーメッセージは useAuth 内で処理済み
   }
 }
+
+const handleCompleteNewPassword = async () => {
+  if (!newPassword.value || !newPasswordConfirm.value) {
+    newPasswordError.value = '新しいパスワードを入力してください。'
+    return
+  }
+
+  if (newPassword.value !== newPasswordConfirm.value) {
+    newPasswordError.value = 'パスワードが一致しません。'
+    return
+  }
+
+  newPasswordError.value = null
+  await completeNewPassword(newPassword.value)
+}
 </script>
 
 <template>
@@ -82,7 +121,42 @@ const handleLogout = async () => {
       <template v-if="!isAuthenticated">
         <h2 class="text-xl font-semibold">ログイン</h2>
         <p class="mt-2 text-sm text-slate-500">Amplify Auth (Amazon Cognito) のユーザーでログインしてください。</p>
-        <form class="mt-4 flex flex-col gap-4" @submit.prevent="handleLogin">
+
+        <template v-if="requiresNewPassword">
+          <p class="mt-4 rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-700">
+            初回ログインのため、新しいパスワードを設定してください。
+          </p>
+          <form class="mt-4 flex flex-col gap-4" @submit.prevent="handleCompleteNewPassword">
+            <input
+              v-model="newPassword"
+              type="password"
+              placeholder="新しいパスワード"
+              class="rounded-md border border-slate-300 px-3 py-2 text-base shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              :disabled="authLoading"
+              autocomplete="new-password"
+            />
+            <input
+              v-model="newPasswordConfirm"
+              type="password"
+              placeholder="新しいパスワード (確認)"
+              class="rounded-md border border-slate-300 px-3 py-2 text-base shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              :disabled="authLoading"
+              autocomplete="new-password"
+            />
+            <button
+              type="submit"
+              class="rounded-md bg-blue-600 px-4 py-2 font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+              :disabled="authLoading || !newPassword || !newPasswordConfirm"
+            >
+              パスワードを更新
+            </button>
+          </form>
+          <p v-if="newPasswordError" class="mt-4 rounded-md bg-orange-50 px-3 py-2 text-sm text-orange-700">
+            {{ newPasswordError }}
+          </p>
+        </template>
+
+        <form v-else class="mt-4 flex flex-col gap-4" @submit.prevent="handleLogin">
           <input
             v-model="email"
             type="email"
