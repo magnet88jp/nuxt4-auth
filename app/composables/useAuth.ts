@@ -17,7 +17,8 @@ async function loadUser() {
 
   try {
     user.value = await getCurrentUser()
-  } catch {
+  }
+  catch {
     user.value = null
   }
 }
@@ -32,11 +33,13 @@ async function withState<R>(handler: () => Promise<R>) {
 
   try {
     return await handler()
-  } catch (err) {
+  }
+  catch (err) {
     console.error('[Auth] Amplify auth request failed.', err)
     error.value = err instanceof Error ? err.message : '認証エラーが発生しました'
     throw err
-  } finally {
+  }
+  finally {
     loading.value = false
   }
 }
@@ -55,20 +58,23 @@ export function useAuth() {
       if (result?.isSignedIn) {
         await loadUser()
         challenge.value = null
-      } else if (result?.nextStep?.signInStep) {
+      }
+      else if (result?.nextStep?.signInStep) {
         const step = result.nextStep.signInStep
         if (step === 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED') {
           challenge.value = 'NEW_PASSWORD_REQUIRED'
           error.value = '初回ログイン用の新しいパスワードを設定してください。'
-        } else {
+        }
+        else {
           challenge.value = null
-          error.value =
-            step === 'CONFIRM_SIGN_UP'
+          error.value
+            = step === 'CONFIRM_SIGN_UP'
               ? 'メールアドレスの確認コードを入力してください。'
               : `追加の認証ステップが必要です (${step})`
         }
       }
-    } catch {
+    }
+    catch {
       // error state already captured in withState
     }
   }
@@ -76,9 +82,11 @@ export function useAuth() {
   const logout = async () => {
     try {
       await withState(() => signOut())
-    } catch {
+    }
+    catch {
       // error already handled
-    } finally {
+    }
+    finally {
       user.value = null
       challenge.value = null
     }
@@ -90,17 +98,20 @@ export function useAuth() {
       if (result?.isSignedIn) {
         challenge.value = null
         await loadUser()
-      } else if (result?.nextStep?.signInStep) {
+      }
+      else if (result?.nextStep?.signInStep) {
         const step = result.nextStep.signInStep
         if (step === 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED') {
           challenge.value = 'NEW_PASSWORD_REQUIRED'
           error.value = 'パスワードの要件を満たしていません。別のパスワードを試してください。'
-        } else {
+        }
+        else {
           challenge.value = null
           error.value = `追加の認証ステップが必要です (${step})`
         }
       }
-    } catch {
+    }
+    catch {
       // handled by withState
     }
   }
