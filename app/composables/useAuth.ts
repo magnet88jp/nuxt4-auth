@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue'
-import { confirmSignIn, getCurrentUser, signIn, signOut } from 'aws-amplify/auth'
+import { confirmSignIn, fetchAuthSession, getCurrentUser, signIn, signOut } from 'aws-amplify/auth'
 
 type AuthUser = Awaited<ReturnType<typeof getCurrentUser>>
 
@@ -7,6 +7,8 @@ const user = ref<AuthUser | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
 const challenge = ref<'NEW_PASSWORD_REQUIRED' | null>(null)
+const identityId = ref<string | null>(null)
+const identityLoading = ref(false)
 
 let initialized = false
 
@@ -20,6 +22,30 @@ async function loadUser() {
   }
   catch {
     user.value = null
+  }
+}
+
+async function loadIdentity(options: { forceRefresh?: boolean } = {}) {
+  if (!import.meta.client) {
+    return
+  }
+
+  if (identityLoading.value) {
+    return
+  }
+
+  identityLoading.value = true
+
+  try {
+    const session = await fetchAuthSession({ forceRefresh: options.forceRefresh })
+    identityId.value = session.identityId ?? null
+  }
+  catch (err) {
+    console.error('[Auth] Amplify identity request failed.', err)
+    identityId.value = null
+  }
+  finally {
+    identityLoading.value = false
   }
 }
 
@@ -47,7 +73,7 @@ async function withState<R>(handler: () => Promise<R>) {
 export function useAuth() {
   if (import.meta.client && !initialized) {
     initialized = true
-    void loadUser()
+    void Promise.all([loadUser(), loadIdentity()])
   }
 
   const isAuthenticated = computed(() => user.value !== null)
@@ -57,6 +83,7 @@ export function useAuth() {
       const result = await withState(() => signIn({ username, password }))
       if (result?.isSignedIn) {
         await loadUser()
+        await loadIdentity({ forceRefresh: true })
         challenge.value = null
       }
       else if (result?.nextStep?.signInStep) {
@@ -89,6 +116,8 @@ export function useAuth() {
     finally {
       user.value = null
       challenge.value = null
+      identityId.value = null
+      await loadIdentity({ forceRefresh: true })
     }
   }
 
@@ -98,6 +127,7 @@ export function useAuth() {
       if (result?.isSignedIn) {
         challenge.value = null
         await loadUser()
+        await loadIdentity({ forceRefresh: true })
       }
       else if (result?.nextStep?.signInStep) {
         const step = result.nextStep.signInStep
@@ -122,9 +152,12 @@ export function useAuth() {
     loading,
     error,
     challenge,
+    identityId,
+    identityLoading,
     login,
     logout,
     completeNewPassword,
     refresh: loadUser,
+    refreshIdentity: loadIdentity,
   }
 }

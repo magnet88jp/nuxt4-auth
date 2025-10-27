@@ -6,6 +6,12 @@ adding a new "isDone" field as a boolean. The authorization rule below
 specifies that any unauthenticated user can "create", "read", "update",
 and "delete" any "Todo" records.
 ========================================================================= */
+const ownerRules = (allow: any) => [
+  allow.owner(),
+  allow.owner({ ownerField: 'ownerIdentityId', identityClaim: 'cognito-identity.amazonaws.com:sub' }),
+  allow.guest().to(['get', 'list', 'create']),
+]
+
 const schema = a.schema({
   Todo: a
     .model({
@@ -13,6 +19,22 @@ const schema = a.schema({
       isDone: a.boolean().default(false),
     })
     .authorization(allow => [allow.owner(), allow.guest().to(['get', 'list'])]),
+  Post: a
+    .model({
+      title: a.string().required(),
+      body: a.string().required(),
+      nickname: a.string(),
+      ownerIdentityId: a.string(),
+    })
+    .authorization(ownerRules),
+  Comment: a
+    .model({
+      postId: a.id().required(),
+      body: a.string().required(),
+      nickname: a.string(),
+      ownerIdentityId: a.string(),
+    })
+    .authorization(ownerRules),
 })
 
 export type Schema = ClientSchema<typeof schema>
