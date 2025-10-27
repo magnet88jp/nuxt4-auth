@@ -26,10 +26,11 @@ const requiresNewPassword = computed(() => challenge.value === 'NEW_PASSWORD_REQ
 
 watch(
   () => isAuthenticated.value,
-  async () => {
-    await fetchTodos()
+  async (authed) => {
+    // 未認証なら identityPool で一覧を取得、認証済みならデフォルト(userPool)
+    await fetchTodos(authed ? undefined : 'identityPool')
   },
-  { immediate: true }
+  { immediate: true },
 )
 
 watch(
@@ -40,7 +41,7 @@ watch(
       newPasswordConfirm.value = ''
       newPasswordError.value = null
     }
-  }
+  },
 )
 
 const handleSubmit = async () => {
@@ -57,7 +58,7 @@ const handleToggle = async (id: string) => {
     return
   }
 
-  const todo = todos.value.find((item) => item.id === id)
+  const todo = todos.value.find(item => item.id === id)
   if (!todo) {
     return
   }
@@ -70,7 +71,7 @@ const handleDelete = async (id: string) => {
     return
   }
 
-  const todo = todos.value.find((item) => item.id === id)
+  const todo = todos.value.find(item => item.id === id)
   if (!todo) {
     return
   }
@@ -93,7 +94,8 @@ const handleLogin = async () => {
 const handleLogout = async () => {
   try {
     await logout()
-  } catch {
+  }
+  catch {
     // エラーメッセージは useAuth 内で処理済み
   }
 }
@@ -117,20 +119,31 @@ const handleCompleteNewPassword = async () => {
 <template>
   <main class="mx-auto flex min-h-screen max-w-2xl flex-col gap-8 px-4 py-12">
     <section>
-      <h1 class="text-3xl font-semibold tracking-tight">Todo リスト</h1>
-      <p class="mt-2 text-slate-600">Amplify Data 経由で DynamoDB に保存されたタスクを管理します。</p>
+      <h1 class="text-3xl font-semibold tracking-tight">
+        Todo リスト
+      </h1>
+      <p class="mt-2 text-slate-600">
+        Amplify Data 経由で DynamoDB に保存されたタスクを管理します。
+      </p>
     </section>
 
     <section class="rounded-lg bg-white p-6 shadow-sm ring-1 ring-slate-200">
       <template v-if="!isAuthenticated">
-        <h2 class="text-xl font-semibold">ログイン</h2>
-        <p class="mt-2 text-sm text-slate-500">Amplify Auth (Amazon Cognito) のユーザーでログインしてください。</p>
+        <h2 class="text-xl font-semibold">
+          ログイン
+        </h2>
+        <p class="mt-2 text-sm text-slate-500">
+          Amplify Auth (Amazon Cognito) のユーザーでログインしてください。
+        </p>
 
         <template v-if="requiresNewPassword">
           <p class="mt-4 rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-700">
             初回ログインのため、新しいパスワードを設定してください。
           </p>
-          <form class="mt-4 flex flex-col gap-4" @submit.prevent="handleCompleteNewPassword">
+          <form
+            class="mt-4 flex flex-col gap-4"
+            @submit.prevent="handleCompleteNewPassword"
+          >
             <input
               v-model="newPassword"
               type="password"
@@ -138,7 +151,7 @@ const handleCompleteNewPassword = async () => {
               class="rounded-md border border-slate-300 px-3 py-2 text-base shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
               :disabled="authLoading"
               autocomplete="new-password"
-            />
+            >
             <input
               v-model="newPasswordConfirm"
               type="password"
@@ -146,7 +159,7 @@ const handleCompleteNewPassword = async () => {
               class="rounded-md border border-slate-300 px-3 py-2 text-base shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
               :disabled="authLoading"
               autocomplete="new-password"
-            />
+            >
             <button
               type="submit"
               class="rounded-md bg-blue-600 px-4 py-2 font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
@@ -155,12 +168,19 @@ const handleCompleteNewPassword = async () => {
               パスワードを更新
             </button>
           </form>
-          <p v-if="newPasswordError" class="mt-4 rounded-md bg-orange-50 px-3 py-2 text-sm text-orange-700">
+          <p
+            v-if="newPasswordError"
+            class="mt-4 rounded-md bg-orange-50 px-3 py-2 text-sm text-orange-700"
+          >
             {{ newPasswordError }}
           </p>
         </template>
 
-        <form v-else class="mt-4 flex flex-col gap-4" @submit.prevent="handleLogin">
+        <form
+          v-else
+          class="mt-4 flex flex-col gap-4"
+          @submit.prevent="handleLogin"
+        >
           <input
             v-model="email"
             type="email"
@@ -168,7 +188,7 @@ const handleCompleteNewPassword = async () => {
             class="rounded-md border border-slate-300 px-3 py-2 text-base shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
             :disabled="authLoading"
             autocomplete="username"
-          />
+          >
           <input
             v-model="password"
             type="password"
@@ -176,7 +196,7 @@ const handleCompleteNewPassword = async () => {
             class="rounded-md border border-slate-300 px-3 py-2 text-base shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
             :disabled="authLoading"
             autocomplete="current-password"
-          />
+          >
           <button
             type="submit"
             class="rounded-md bg-blue-600 px-4 py-2 font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
@@ -185,7 +205,10 @@ const handleCompleteNewPassword = async () => {
             ログイン
           </button>
         </form>
-        <p v-if="authError" class="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">
+        <p
+          v-if="authError"
+          class="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600"
+        >
           {{ authError }}
         </p>
       </template>
@@ -193,7 +216,9 @@ const handleCompleteNewPassword = async () => {
       <template v-else>
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p class="text-sm font-medium text-slate-500">ログイン中</p>
+            <p class="text-sm font-medium text-slate-500">
+              ログイン中
+            </p>
             <p class="text-base font-semibold text-slate-800">
               {{ currentUser?.signInDetails?.loginId || currentUser?.username }}
             </p>
@@ -207,21 +232,30 @@ const handleCompleteNewPassword = async () => {
             ログアウト
           </button>
         </div>
-        <p v-if="authError" class="mt-4 rounded-md bg-yellow-50 px-3 py-2 text-sm text-yellow-700">
+        <p
+          v-if="authError"
+          class="mt-4 rounded-md bg-yellow-50 px-3 py-2 text-sm text-yellow-700"
+        >
           {{ authError }}
         </p>
       </template>
     </section>
 
-    <section v-if="isAuthenticated" class="rounded-lg bg-white p-6 shadow-sm ring-1 ring-slate-200">
-      <form class="flex flex-col gap-4 sm:flex-row" @submit.prevent="handleSubmit">
+    <section
+      v-if="isAuthenticated"
+      class="rounded-lg bg-white p-6 shadow-sm ring-1 ring-slate-200"
+    >
+      <form
+        class="flex flex-col gap-4 sm:flex-row"
+        @submit.prevent="handleSubmit"
+      >
         <input
           v-model="newTodo"
           type="text"
           placeholder="新しいタスクを入力"
           class="flex-1 rounded-md border border-slate-300 px-3 py-2 text-base shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
           :disabled="loading"
-        />
+        >
         <button
           type="submit"
           class="rounded-md bg-blue-600 px-4 py-2 font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
@@ -230,10 +264,18 @@ const handleCompleteNewPassword = async () => {
           追加
         </button>
       </form>
-      <p v-if="error" class="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">
+      <p
+        v-if="error"
+        class="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600"
+      >
         {{ error }}
       </p>
-      <p v-else-if="loading && !hasTodos" class="mt-4 text-sm text-slate-500">読み込み中...</p>
+      <p
+        v-else-if="loading && !hasTodos"
+        class="mt-4 text-sm text-slate-500"
+      >
+        読み込み中...
+      </p>
     </section>
 
     <section class="space-y-3">
@@ -250,7 +292,7 @@ const handleCompleteNewPassword = async () => {
             :checked="todo.isDone"
             :disabled="loading || !isAuthenticated"
             @change="handleToggle(todo.id)"
-          />
+          >
           <label
             :for="`todo-${todo.id}`"
             class="text-base"
@@ -270,10 +312,16 @@ const handleCompleteNewPassword = async () => {
         </button>
       </article>
 
-      <p v-if="!hasTodos && !loading && isAuthenticated" class="text-sm text-slate-500">
+      <p
+        v-if="!hasTodos && !loading && isAuthenticated"
+        class="text-sm text-slate-500"
+      >
         タスクはまだありません。最初のタスクを追加してください。
       </p>
-      <p v-else-if="!hasTodos && !loading" class="text-sm text-slate-500">
+      <p
+        v-else-if="!hasTodos && !loading"
+        class="text-sm text-slate-500"
+      >
         タスクはまだありません。ログインしてタスクを追加してください。
       </p>
     </section>
