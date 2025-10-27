@@ -1,9 +1,6 @@
 <template>
-  <div>
+  <div class="min-h-screen bg-slate-50 text-slate-900">
     <NuxtRouteAnnouncer />
-    <NuxtWelcome />
-    <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-      Button
-    </button>
+    <NuxtPage />
   </div>
 </template>

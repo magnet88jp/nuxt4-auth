@@ -20,6 +20,16 @@ yarn install
 bun install
 ```
 
+### Amplify Setup
+
+Generate the latest Amplify outputs before running the Nuxt app so the Todo data client can connect to DynamoDB:
+
+```bash
+npx ampx generate outputs -o public/amplify_outputs.json
+```
+
+The command above creates `public/amplify_outputs.json`, which the client-side plugin loads at runtime. Re-run it after backend changes.
+
 ## Development Server
 
 Start the development server on `http://localhost:3000`:
