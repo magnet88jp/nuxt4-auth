@@ -26,12 +26,8 @@ const requiresNewPassword = computed(() => challenge.value === 'NEW_PASSWORD_REQ
 
 watch(
   () => isAuthenticated.value,
-  async (signedIn) => {
-    if (signedIn) {
-      await fetchTodos()
-    } else {
-      todos.value = []
-    }
+  async () => {
+    await fetchTodos()
   },
   { immediate: true }
 )
@@ -48,7 +44,7 @@ watch(
 )
 
 const handleSubmit = async () => {
-  if (!newTodo.value.trim()) {
+  if (!isAuthenticated.value || !newTodo.value.trim()) {
     return
   }
 
@@ -57,6 +53,10 @@ const handleSubmit = async () => {
 }
 
 const handleToggle = async (id: string) => {
+  if (!isAuthenticated.value) {
+    return
+  }
+
   const todo = todos.value.find((item) => item.id === id)
   if (!todo) {
     return
@@ -66,6 +66,10 @@ const handleToggle = async (id: string) => {
 }
 
 const handleDelete = async (id: string) => {
+  if (!isAuthenticated.value) {
+    return
+  }
+
   const todo = todos.value.find((item) => item.id === id)
   if (!todo) {
     return
@@ -232,7 +236,7 @@ const handleCompleteNewPassword = async () => {
       <p v-else-if="loading && !hasTodos" class="mt-4 text-sm text-slate-500">読み込み中...</p>
     </section>
 
-    <section v-if="isAuthenticated" class="space-y-3">
+    <section class="space-y-3">
       <article
         v-for="todo in todos"
         :key="todo.id"
@@ -244,7 +248,7 @@ const handleCompleteNewPassword = async () => {
             type="checkbox"
             class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
             :checked="todo.isDone"
-            :disabled="loading"
+            :disabled="loading || !isAuthenticated"
             @change="handleToggle(todo.id)"
           />
           <label
@@ -256,6 +260,7 @@ const handleCompleteNewPassword = async () => {
           </label>
         </div>
         <button
+          v-if="isAuthenticated"
           type="button"
           class="rounded-md border border-transparent px-3 py-1 text-sm font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed"
           :disabled="loading"
@@ -265,13 +270,12 @@ const handleCompleteNewPassword = async () => {
         </button>
       </article>
 
-      <p v-if="!hasTodos && !loading" class="text-sm text-slate-500">
+      <p v-if="!hasTodos && !loading && isAuthenticated" class="text-sm text-slate-500">
         タスクはまだありません。最初のタスクを追加してください。
       </p>
-    </section>
-
-    <section v-else class="rounded-lg border border-dashed border-slate-300 p-6 text-sm text-slate-500">
-      ログインすると DynamoDB に保存されたタスクを管理できます。
+      <p v-else-if="!hasTodos && !loading" class="text-sm text-slate-500">
+        タスクはまだありません。ログインしてタスクを追加してください。
+      </p>
     </section>
   </main>
 </template>

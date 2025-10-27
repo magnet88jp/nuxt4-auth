@@ -12,7 +12,7 @@ const schema = a.schema({
       content: a.string(),
       isDone: a.boolean().default(false),
     })
-    .authorization((allow) => [allow.owner()]),
+    .authorization((allow) => [allow.owner(), allow.guest().to(['read', 'get', 'list'])]),
 });
 
 export type Schema = ClientSchema<typeof schema>;
@@ -21,6 +21,7 @@ export const data = defineData({
   schema,
   authorizationModes: {
     defaultAuthorizationMode: 'userPool',
+    additionalAuthorizationModes: ['identityPool'],
   },
 });
 
