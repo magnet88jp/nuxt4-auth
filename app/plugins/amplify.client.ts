@@ -8,6 +8,13 @@ declare global {
 export default defineNuxtPlugin(() => {
   if (!globalThis.__AMPLIFY_CONFIGURED__) {
     Amplify.configure(outputs, { ssr: true })
+    Amplify.configure({
+      Auth: {
+        Cognito: {
+          allowGuestAccess: true,
+        },
+      },
+    })
     globalThis.__AMPLIFY_CONFIGURED__ = true
   }
 })
