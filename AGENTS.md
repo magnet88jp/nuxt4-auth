@@ -21,6 +21,11 @@
 - Use kebab-case filenames for Vue components, camelCase for composables and utilities, and SCREAMING_SNAKE_CASE for environment variables.
 - Favor Tailwind utility classes and Nuxt UI primitives; only add custom CSS when a utility cannot express the layout.
 
+## Component Usage
+- Default to Nuxt UI components whenever possible before building custom UI elements.
+- Consult the Nuxt UI MCP resources to confirm available props, slots, and usage patterns before extending or wrapping a component.
+- Extend Nuxt UI components with slots or props rather than rewriting their behavior; only create bespoke components when Nuxt UI cannot cover the required interaction.
+
 ## Testing Guidelines
 - Store specs in `tests/`, mirroring the `app/` structure, and suffix them with `.spec.ts`.
 - Leverage Nuxt Test Utils (Vitest under the hood); import helpers from `@nuxt/test-utils/runtime`.
