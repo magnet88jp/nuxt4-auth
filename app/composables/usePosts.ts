@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import { generateClient } from 'aws-amplify/data'
-import type { Schema } from '~/amplify/data/resource'
+import type { Schema } from '~~/amplify/data/resource'
 
 const client = import.meta.client ? generateClient<Schema>() : null
 
