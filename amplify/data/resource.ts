@@ -13,6 +13,16 @@ const schema = a.schema({
       isDone: a.boolean().default(false),
     })
     .authorization(allow => [allow.owner(), allow.guest().to(['get', 'list'])]),
+  Post: a
+    .model({
+      content: a.string().required(),
+      displayName: a.string(),
+    })
+    .authorization(allow => [
+      allow.owner().to(['create', 'get', 'list', 'update', 'delete']),
+      allow.authenticated().to(['get', 'list']),
+      allow.guest().to(['create', 'get', 'list']),
+    ]),
 })
 
 export type Schema = ClientSchema<typeof schema>
@@ -21,6 +31,7 @@ export const data = defineData({
   schema,
   authorizationModes: {
     defaultAuthorizationMode: 'userPool',
+    additionalAuthorizationModes: ['identityPool'],
   },
 })
 
