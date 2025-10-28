@@ -130,7 +130,10 @@ watch(
       </h2>
       <div class="mt-4 space-y-4">
         <div>
-          <label class="block text-sm font-medium text-slate-600" for="displayName">表示名（任意）</label>
+          <label
+            class="block text-sm font-medium text-slate-600"
+            for="displayName"
+          >表示名（任意）</label>
           <input
             id="displayName"
             v-model="newDisplayName"
@@ -140,14 +143,17 @@ watch(
           >
         </div>
         <div>
-          <label class="block text-sm font-medium text-slate-600" for="content">本文</label>
+          <label
+            class="block text-sm font-medium text-slate-600"
+            for="content"
+          >本文</label>
           <textarea
             id="content"
             v-model="newContent"
             rows="4"
             class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-base shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
             placeholder="メッセージを入力してください"
-          ></textarea>
+          />
         </div>
         <div class="flex items-center justify-between">
           <p class="text-xs text-slate-500">
@@ -218,9 +224,15 @@ watch(
           </time>
         </header>
 
-        <div v-if="editingId === post.id" class="space-y-4">
+        <div
+          v-if="editingId === post.id"
+          class="space-y-4"
+        >
           <div>
-            <label class="block text-xs font-medium text-slate-500" :for="`edit-display-${post.id}`">表示名</label>
+            <label
+              class="block text-xs font-medium text-slate-500"
+              :for="`edit-display-${post.id}`"
+            >表示名</label>
             <input
               :id="`edit-display-${post.id}`"
               v-model="editDisplayName"
@@ -229,13 +241,16 @@ watch(
             >
           </div>
           <div>
-            <label class="block text-xs font-medium text-slate-500" :for="`edit-content-${post.id}`">本文</label>
+            <label
+              class="block text-xs font-medium text-slate-500"
+              :for="`edit-content-${post.id}`"
+            >本文</label>
             <textarea
               :id="`edit-content-${post.id}`"
               v-model="editContent"
               rows="3"
               class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-            ></textarea>
+            />
           </div>
           <div class="flex items-center justify-end gap-2">
             <button
