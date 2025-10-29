@@ -26,9 +26,9 @@ const requiresNewPassword = computed(() => challenge.value === 'NEW_PASSWORD_REQ
 
 watch(
   () => isAuthenticated.value,
-  async (authed) => {
-    // 未認証なら identityPool で一覧を取得、認証済みならデフォルト(userPool)
-    await fetchTodos(authed ? undefined : 'identityPool')
+  async () => {
+    // 認証状態に応じてサーバー側で authMode を選択
+    await fetchTodos()
   },
   { immediate: true },
 )
