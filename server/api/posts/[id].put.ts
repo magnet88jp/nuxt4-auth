@@ -136,9 +136,14 @@ export default defineEventHandler(async event => {
     authToken: token,
   } as any)
 
+  const authOptions = {
+    authMode: 'userPool' as const,
+    authToken: token,
+  }
+
   let existing: ModelResponse<PostModel>
   try {
-    existing = await client.models.Post.get({ id }) as ModelResponse<PostModel>
+    existing = await client.models.Post.get({ id }, authOptions) as ModelResponse<PostModel>
   }
   catch (error) {
     console.error('[Posts] Failed to load post', error)
@@ -161,11 +166,14 @@ export default defineEventHandler(async event => {
 
   let updated: ModelResponse<PostModel>
   try {
-    updated = await client.models.Post.update({
-      id,
-      content,
-      displayName: normalizedDisplayName,
-    }) as ModelResponse<PostModel>
+    updated = await client.models.Post.update(
+      {
+        id,
+        content,
+        displayName: normalizedDisplayName,
+      },
+      authOptions,
+    ) as ModelResponse<PostModel>
   }
   catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to update post'
