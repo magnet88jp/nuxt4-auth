@@ -3,7 +3,7 @@ import { CognitoJwtVerifier } from 'aws-jwt-verify'
 import { generateClient } from 'aws-amplify/data/server'
 import outputs from '~~/amplify_outputs.json' assert { type: 'json' }
 import type { Schema } from '~~/amplify/data/resource'
-import { amplifyConfig, runAmplifyApi } from '~/server/utils/amplify'
+import { amplifyConfig, runAmplifyApi } from '~~/server/utils/amplify'
 
 type CognitoConfig = {
   userPoolId?: string
@@ -83,7 +83,7 @@ function collectErrors(response?: ModelResponse<unknown>) {
   return response?.errors?.map(entry => entry?.message).filter(Boolean).join('; ')
 }
 
-export default defineEventHandler(async event => {
+export default defineEventHandler(async (event) => {
   if (!cognitoConfig.userPoolId || !cognitoConfig.clientId) {
     throw createError({ statusCode: 500, statusMessage: 'Cognito configuration is missing' })
   }
@@ -104,7 +104,7 @@ export default defineEventHandler(async event => {
     throw createError({ statusCode: 400, statusMessage: 'Post id is required' })
   }
 
-  const body = await readBody<{ content?: string; displayName?: string | null }>(event)
+  const body = await readBody<{ content?: string, displayName?: string | null }>(event)
   const content = (body?.content ?? '').trim()
   if (!content) {
     throw createError({ statusCode: 400, statusMessage: 'content is required' })
