@@ -91,7 +91,9 @@ export default defineEventHandler(async event => {
 
   const bearer = extractBearerToken(getHeader(event, 'authorization'))
 
-  let authMode: 'userPool' | 'identityPool' = 'identityPool'
+  type AuthMode = 'userPool' | 'identityPool' | 'guest'
+
+  let authMode: AuthMode = 'identityPool'
   let authToken: string | undefined
 
   if (bearer) {
@@ -110,8 +112,24 @@ export default defineEventHandler(async event => {
     response = await client.models.Todo.list({ authMode }) as ModelResponse<TodoModel[]>
   }
   catch (error) {
-    console.error('[Todos] Failed to list todos', error)
-    throw createError({ statusCode: 500, statusMessage: 'Failed to fetch todos' })
+    const message = error instanceof Error ? error.message : String(error)
+    const isFederatedJwtMissing = /no federated jwt/i.test(message)
+
+    if (!authToken && authMode === 'identityPool' && isFederatedJwtMissing) {
+      try {
+        const guestClient = generateClient<Schema>({ authMode: 'guest' } as any)
+        response = await guestClient.models.Todo.list({ authMode: 'guest' }) as ModelResponse<TodoModel[]>
+        authMode = 'guest'
+      }
+      catch (guestError) {
+        console.error('[Todos] Guest list fallback failed', guestError)
+        throw createError({ statusCode: 500, statusMessage: 'Failed to fetch todos' })
+      }
+    }
+    else {
+      console.error('[Todos] Failed to list todos', error)
+      throw createError({ statusCode: 500, statusMessage: 'Failed to fetch todos' })
+    }
   }
 
   const errors = collectErrors(response)

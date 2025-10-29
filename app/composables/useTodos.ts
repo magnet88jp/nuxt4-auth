@@ -2,7 +2,6 @@
 import { ref } from 'vue'
 import { generateClient } from 'aws-amplify/data'
 import { fetchAuthSession } from 'aws-amplify/auth'
-import { useNuxtApp } from '#imports'
 import type { Schema } from '~~/amplify/data/resource'
 
 const client = typeof window !== 'undefined' ? generateClient<Schema>() : null
@@ -10,7 +9,6 @@ const client = typeof window !== 'undefined' ? generateClient<Schema>() : null
 type TodoModel = Schema['Todo']['type']
 
 export function useTodos() {
-  const { $fetch } = useNuxtApp()
   const todos = ref<TodoModel[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -39,8 +37,8 @@ export function useTodos() {
         const session = await fetchAuthSession()
         token
           = session.tokens?.accessToken?.toString()
-          ?? session.tokens?.idToken?.toString()
-          ?? null
+            ?? session.tokens?.idToken?.toString()
+            ?? null
       }
       catch {
         token = null

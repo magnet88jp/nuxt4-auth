@@ -1,7 +1,6 @@
 import { ref } from 'vue'
 import { generateClient } from 'aws-amplify/data'
 import { fetchAuthSession } from 'aws-amplify/auth'
-import { useNuxtApp } from '#imports'
 import type { Schema } from '~~/amplify/data/resource'
 
 const client = import.meta.client ? generateClient<Schema>() : null
@@ -22,7 +21,6 @@ type UpdatePostInput = {
 }
 
 export function usePosts() {
-  const { $fetch } = useNuxtApp()
   const posts = ref<PostModel[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -83,7 +81,7 @@ export function usePosts() {
       const session = await fetchAuthSession()
       const token
         = session.tokens?.accessToken?.toString()
-        ?? session.tokens?.idToken?.toString()
+          ?? session.tokens?.idToken?.toString()
 
       if (!token) {
         throw new Error('認証情報を取得できませんでした')
