@@ -20,7 +20,8 @@ const schema = a.schema({
     })
     .authorization(allow => [
       allow.owner().to(['create', 'get', 'list', 'update', 'delete']),
-      allow.authenticated().to(['get', 'list']),
+      allow.authenticated('identityPool').to(['get', 'list']),
+      allow.authenticated('userPools').to(['get', 'list']),
       allow.guest().to(['create', 'get', 'list']),
     ]),
 })

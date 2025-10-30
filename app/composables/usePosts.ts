@@ -25,6 +25,22 @@ export function usePosts() {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
+  const resolveUserToken = async () => {
+    if (!import.meta.client) return null
+
+    try {
+      const session = await fetchAuthSession()
+      const token
+        = session.tokens?.accessToken?.toString()
+        ?? session.tokens?.idToken?.toString()
+
+      return token ?? null
+    }
+    catch {
+      return null
+    }
+  }
+
   const run = async <T>(handler: () => Promise<T>) => {
     if (!import.meta.client) return undefined as unknown as T
     loading.value = true
@@ -49,11 +65,29 @@ export function usePosts() {
 
   const fetchPosts = async (authMode?: AuthMode) => {
     await run(async () => {
-      if (!client) {
-        throw new Error('Amplify Data client is not available')
+      let resolvedAuthMode = authMode
+      const headers: Record<string, string> = {}
+
+      if (resolvedAuthMode !== 'identityPool') {
+        const token = await resolveUserToken()
+        if (token) {
+          headers.Authorization = `Bearer ${token}`
+          resolvedAuthMode = resolvedAuthMode ?? 'userPool'
+        }
+        else if (resolvedAuthMode === 'userPool') {
+          throw new Error('認証情報を取得できませんでした')
+        }
+        else if (!resolvedAuthMode) {
+          resolvedAuthMode = 'identityPool'
+        }
       }
-      const response = await client!.models.Post.list({ authMode })
-      sortAndStore(response.data)
+
+      const response = await $fetch<PostModel[]>('/api/posts', {
+        query: resolvedAuthMode ? { authMode: resolvedAuthMode } : undefined,
+        headers: Object.keys(headers).length ? headers : undefined,
+      })
+
+      sortAndStore(response)
     })
   }
 
@@ -78,11 +112,7 @@ export function usePosts() {
     const normalizedDisplayName = displayName?.trim() || null
 
     await run(async () => {
-      const session = await fetchAuthSession()
-      const token
-        = session.tokens?.accessToken?.toString()
-          ?? session.tokens?.idToken?.toString()
-
+      const token = await resolveUserToken()
       if (!token) {
         throw new Error('認証情報を取得できませんでした')
       }

@@ -1,20 +1,8 @@
 import { defineEventHandler, readBody, getHeader, createError } from 'h3'
-import { CognitoJwtVerifier } from 'aws-jwt-verify'
 import { generateClient } from 'aws-amplify/data/server'
-import outputs from '~~/amplify_outputs.json' assert { type: 'json' }
 import type { Schema } from '~~/amplify/data/resource'
 import { amplifyConfig, runAmplifyApi } from '~~/server/utils/amplify'
-
-type CognitoConfig = {
-  userPoolId?: string
-  clientId?: string
-  region?: string
-}
-
-type VerifyPayload = {
-  sub?: string
-  [key: string]: unknown
-}
+import { extractBearerToken, getCognitoConfig, verifyToken } from '~~/server/utils/cognito'
 
 type PostModel = Schema['Post']['type']
 
@@ -23,70 +11,14 @@ type ModelResponse<T> = {
   errors?: { message?: string }[]
 }
 
-const cognitoConfig: CognitoConfig = {
-  userPoolId: outputs.auth?.user_pool_id,
-  clientId: outputs.auth?.user_pool_client_id,
-  region: outputs.auth?.aws_region,
-}
-let cachedAccessVerifier: ReturnType<typeof CognitoJwtVerifier.create> | null = null
-let cachedIdVerifier: ReturnType<typeof CognitoJwtVerifier.create> | null = null
-
 const client = generateClient<Schema>({ config: amplifyConfig })
-
-function extractBearerToken(header?: string | null) {
-  if (!header) return null
-
-  const [type, token] = header.split(' ')
-  if (type?.toLowerCase() !== 'bearer' || !token) return null
-
-  return token
-}
-
-async function verifyToken(token: string): Promise<VerifyPayload> {
-  const { userPoolId, clientId, region } = cognitoConfig
-  if (!userPoolId || !clientId) {
-    throw createError({ statusCode: 500, statusMessage: 'Cognito configuration is missing' })
-  }
-
-  if (!cachedAccessVerifier) {
-    cachedAccessVerifier = CognitoJwtVerifier.create({
-      userPoolId,
-      clientId,
-      region,
-      tokenUse: 'access',
-    })
-  }
-
-  try {
-    return await cachedAccessVerifier.verify(token)
-  }
-  catch {
-    if (!cachedIdVerifier) {
-      cachedIdVerifier = CognitoJwtVerifier.create({
-        userPoolId,
-        clientId,
-        region,
-        tokenUse: 'id',
-      })
-    }
-
-    try {
-      return await cachedIdVerifier.verify(token)
-    }
-    catch {
-      throw createError({ statusCode: 401, statusMessage: 'Invalid or expired token' })
-    }
-  }
-}
 
 function collectErrors(response?: ModelResponse<unknown>) {
   return response?.errors?.map(entry => entry?.message).filter(Boolean).join('; ')
 }
 
 export default defineEventHandler(async (event) => {
-  if (!cognitoConfig.userPoolId || !cognitoConfig.clientId) {
-    throw createError({ statusCode: 500, statusMessage: 'Cognito configuration is missing' })
-  }
+  getCognitoConfig()
 
   const token = extractBearerToken(getHeader(event, 'authorization'))
   if (!token) {
