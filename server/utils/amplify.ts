@@ -1,7 +1,8 @@
 import type { EventHandlerRequest, H3Event } from 'h3'
 import { deleteCookie, parseCookies, setCookie } from 'h3'
+import type {
+  AmplifyServer } from 'aws-amplify/adapter-core'
 import {
-  AmplifyServer,
   createAWSCredentialsAndIdentityIdProvider,
   createKeyValueStorageFromCookieStorageAdapter,
   createUserPoolsTokenProvider,
