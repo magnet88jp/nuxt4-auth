@@ -69,12 +69,12 @@ export default defineEventHandler(async (event) => {
 
   const amplifyAuthMode: ClientAuthMode | undefined = resolvedAuthMode === 'identityPool' ? 'iam' : resolvedAuthMode
 
-  const options: { authMode?: ClientAuthMode, authToken?: string } = {}
+  const listArgs: { authMode?: ClientAuthMode, authToken?: string } = {}
   if (amplifyAuthMode) {
-    options.authMode = amplifyAuthMode
+    listArgs.authMode = amplifyAuthMode
   }
   if (amplifyAuthMode === 'userPool' && authToken) {
-    options.authToken = authToken
+    listArgs.authToken = authToken
   }
 
   let result: ModelResponse<PostModel>
@@ -82,8 +82,7 @@ export default defineEventHandler(async (event) => {
     result = await runAmplifyApi(event, context =>
       client.models.Post.list(
         context,
-        undefined,
-        options,
+        Object.keys(listArgs).length ? listArgs : undefined,
       ),
     ) as ModelResponse<PostModel>
   }
