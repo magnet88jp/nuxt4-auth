@@ -5,7 +5,8 @@ import { amplifyConfig, runAmplifyApi } from '~~/server/utils/amplify'
 import { extractBearerToken, getCognitoConfig, verifyToken } from '~~/server/utils/cognito'
 
 type PostModel = Schema['Post']['type']
-type AuthMode = 'userPool' | 'identityPool' | 'iam' | 'apiKey'
+type RequestAuthMode = 'userPool' | 'identityPool' | 'iam' | 'apiKey'
+type ClientAuthMode = 'userPool' | 'iam' | 'apiKey'
 
 type ModelResponse<T> = {
   data?: T[] | null
@@ -13,18 +14,28 @@ type ModelResponse<T> = {
 }
 
 const client = generateClient<Schema>({ config: amplifyConfig })
-const allowedAuthModes: AuthMode[] = ['userPool', 'identityPool', 'iam', 'apiKey']
+const allowedAuthModes: RequestAuthMode[] = ['userPool', 'identityPool', 'iam', 'apiKey']
 
 function collectErrors(response?: ModelResponse<unknown>) {
   return response?.errors?.map(entry => entry?.message).filter(Boolean).join('; ')
+}
+
+function deriveError(message: string) {
+  if (/no current user|no federated jwt|missing bearer token/i.test(message)) {
+    return { statusCode: 401, statusMessage: 'Unauthorized' }
+  }
+  if (/not authorized|unauthorized|forbidden/i.test(message)) {
+    return { statusCode: 403, statusMessage: 'Forbidden' }
+  }
+  return { statusCode: 500, statusMessage: 'Failed to load posts' }
 }
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event)
   const authModeParam = typeof query.authMode === 'string' ? query.authMode : undefined
   const hasExplicitAuthMode = !!authModeParam
-  const requestedAuthMode = allowedAuthModes.includes(authModeParam as AuthMode)
-    ? authModeParam as AuthMode
+  const requestedAuthMode = allowedAuthModes.includes(authModeParam as RequestAuthMode)
+    ? authModeParam as RequestAuthMode
     : undefined
 
   if (hasExplicitAuthMode && !requestedAuthMode) {
@@ -35,7 +46,7 @@ export default defineEventHandler(async (event) => {
   let resolvedAuthMode = requestedAuthMode
   let authToken: string | undefined
 
-  if (resolvedAuthMode === 'userPool' || (!resolvedAuthMode && token)) {
+  if (resolvedAuthMode === 'userPool' || (resolvedAuthMode !== 'iam' && !resolvedAuthMode && token)) {
     getCognitoConfig()
 
     if (!token) {
@@ -56,11 +67,13 @@ export default defineEventHandler(async (event) => {
     resolvedAuthMode = hasExplicitAuthMode ? requestedAuthMode : 'identityPool'
   }
 
-  const options: { authMode?: AuthMode, authToken?: string } = {}
-  if (resolvedAuthMode) {
-    options.authMode = resolvedAuthMode
+  const amplifyAuthMode: ClientAuthMode | undefined = resolvedAuthMode === 'identityPool' ? 'iam' : resolvedAuthMode
+
+  const options: { authMode?: ClientAuthMode, authToken?: string } = {}
+  if (amplifyAuthMode) {
+    options.authMode = amplifyAuthMode
   }
-  if (resolvedAuthMode === 'userPool' && authToken) {
+  if (amplifyAuthMode === 'userPool' && authToken) {
     options.authToken = authToken
   }
 
@@ -75,14 +88,15 @@ export default defineEventHandler(async (event) => {
     ) as ModelResponse<PostModel>
   }
   catch (error) {
+    const message = error instanceof Error ? error.message : ''
     console.error('[Posts] Failed to list posts', error)
-    throw createError({ statusCode: 500, statusMessage: 'Failed to load posts' })
+    throw createError(deriveError(message))
   }
 
   const listErrors = collectErrors(result)
   if (listErrors) {
-    const isForbidden = /not authorized|unauthorized|forbidden/i.test(listErrors)
-    throw createError({ statusCode: isForbidden ? 403 : 500, statusMessage: listErrors })
+    console.error('[Posts] List posts returned errors', listErrors)
+    throw createError(deriveError(listErrors))
   }
 
   return result.data ?? []
