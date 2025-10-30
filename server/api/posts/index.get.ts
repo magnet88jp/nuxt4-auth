@@ -46,12 +46,8 @@ export default defineEventHandler(async (event) => {
   let resolvedAuthMode = requestedAuthMode
   let authToken: string | undefined
 
-  if (resolvedAuthMode === 'userPool' || (resolvedAuthMode !== 'iam' && !resolvedAuthMode && token)) {
+  if (token && requestedAuthMode !== 'iam') {
     getCognitoConfig()
-
-    if (!token) {
-      throw createError({ statusCode: 401, statusMessage: 'Missing bearer token' })
-    }
 
     const payload = await verifyToken(token)
     const userSub = typeof payload.sub === 'string' ? payload.sub : null
@@ -65,6 +61,10 @@ export default defineEventHandler(async (event) => {
 
   if (!resolvedAuthMode) {
     resolvedAuthMode = hasExplicitAuthMode ? requestedAuthMode : 'identityPool'
+  }
+
+  if (resolvedAuthMode === 'userPool' && !authToken) {
+    throw createError({ statusCode: 401, statusMessage: 'Missing bearer token' })
   }
 
   const amplifyAuthMode: ClientAuthMode | undefined = resolvedAuthMode === 'identityPool' ? 'iam' : resolvedAuthMode
