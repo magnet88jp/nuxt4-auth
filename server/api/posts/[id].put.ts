@@ -1,11 +1,9 @@
 import { defineEventHandler, readBody, getHeader, createError } from 'h3'
-import { Amplify } from 'aws-amplify'
-import { generateClient } from 'aws-amplify/data'
 import { CognitoJwtVerifier } from 'aws-jwt-verify'
+import { generateClient } from 'aws-amplify/data/server'
 import outputs from '~~/amplify_outputs.json' assert { type: 'json' }
 import type { Schema } from '~~/amplify/data/resource'
-
-type AmplifyOutputs = typeof outputs
+import { amplifyConfig, runAmplifyApi } from '~~/server/utils/amplify'
 
 type CognitoConfig = {
   userPoolId?: string
@@ -26,23 +24,14 @@ type ModelResponse<T> = {
 }
 
 const cognitoConfig: CognitoConfig = {
-  userPoolId: (outputs as AmplifyOutputs).auth?.user_pool_id,
-  clientId: (outputs as AmplifyOutputs).auth?.user_pool_client_id,
-  region: (outputs as AmplifyOutputs).auth?.aws_region,
+  userPoolId: outputs.auth?.user_pool_id,
+  clientId: outputs.auth?.user_pool_client_id,
+  region: outputs.auth?.aws_region,
 }
-
-const appSyncUrl = (outputs as AmplifyOutputs).data?.url
-
-let amplifyConfigured = false
 let cachedAccessVerifier: ReturnType<typeof CognitoJwtVerifier.create> | null = null
 let cachedIdVerifier: ReturnType<typeof CognitoJwtVerifier.create> | null = null
 
-function ensureAmplifyConfigured() {
-  if (amplifyConfigured) return
-
-  Amplify.configure(outputs as AmplifyOutputs, { ssr: true })
-  amplifyConfigured = true
-}
+const client = generateClient<Schema>({ config: amplifyConfig })
 
 function extractBearerToken(header?: string | null) {
   if (!header) return null
@@ -94,13 +83,9 @@ function collectErrors(response?: ModelResponse<unknown>) {
   return response?.errors?.map(entry => entry?.message).filter(Boolean).join('; ')
 }
 
-export default defineEventHandler(async event => {
+export default defineEventHandler(async (event) => {
   if (!cognitoConfig.userPoolId || !cognitoConfig.clientId) {
     throw createError({ statusCode: 500, statusMessage: 'Cognito configuration is missing' })
-  }
-
-  if (!appSyncUrl) {
-    throw createError({ statusCode: 500, statusMessage: 'AppSync endpoint is missing' })
   }
 
   const token = extractBearerToken(getHeader(event, 'authorization'))
@@ -119,7 +104,7 @@ export default defineEventHandler(async event => {
     throw createError({ statusCode: 400, statusMessage: 'Post id is required' })
   }
 
-  const body = await readBody<{ content?: string; displayName?: string | null }>(event)
+  const body = await readBody<{ content?: string, displayName?: string | null }>(event)
   const content = (body?.content ?? '').trim()
   if (!content) {
     throw createError({ statusCode: 400, statusMessage: 'content is required' })
@@ -129,16 +114,15 @@ export default defineEventHandler(async event => {
   const displayName = typeof displayNameInput === 'string' ? displayNameInput.trim() : displayNameInput ?? null
   const normalizedDisplayName = displayName === '' ? null : displayName
 
-  ensureAmplifyConfigured()
-
-  const client = generateClient<Schema>({
-    authMode: 'userPool',
-    authToken: token,
-  } as any)
-
   let existing: ModelResponse<PostModel>
   try {
-    existing = await client.models.Post.get({ id }) as ModelResponse<PostModel>
+    existing = await runAmplifyApi(event, context =>
+      client.models.Post.get(
+        context,
+        { id },
+        { authMode: 'userPool', authToken: token },
+      ),
+    ) as ModelResponse<PostModel>
   }
   catch (error) {
     console.error('[Posts] Failed to load post', error)
@@ -161,11 +145,17 @@ export default defineEventHandler(async event => {
 
   let updated: ModelResponse<PostModel>
   try {
-    updated = await client.models.Post.update({
-      id,
-      content,
-      displayName: normalizedDisplayName,
-    }) as ModelResponse<PostModel>
+    updated = await runAmplifyApi(event, context =>
+      client.models.Post.update(
+        context,
+        {
+          id,
+          content,
+          displayName: normalizedDisplayName,
+        },
+        { authMode: 'userPool', authToken: token },
+      ),
+    ) as ModelResponse<PostModel>
   }
   catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to update post'
