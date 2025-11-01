@@ -1,15 +1,18 @@
-import { z } from 'zod'
+import { nullish, pipe, string, trim, minLength, transform } from 'valibot'
 
-export const contentSchema = z.string().trim().min(1, 'content is required')
+export const contentSchema = pipe(
+  string(),
+  trim(),
+  minLength(1, 'content is required'),
+)
 
-export const displayNameSchema = z
-  .string()
-  .optional()
-  .nullable()
-  .transform((value) => {
+export const displayNameSchema = pipe(
+  nullish(string()),
+  transform(value => {
     if (value == null) {
       return null
     }
     const trimmed = value.trim()
     return trimmed === '' ? null : trimmed
-  })
+  }),
+)

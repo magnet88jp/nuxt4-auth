@@ -25,7 +25,7 @@ const editError = ref<string | null>(null)
 const editingId = ref<string | null>(null)
 const editDisplayName = ref('')
 const editContent = ref('')
-const hasFetchedPosts = ref(false)
+const hasFetchedInitially = ref(false)
 
 const resetComposer = () => {
   newContent.value = ''
@@ -87,12 +87,16 @@ const handleDelete = async (postId: string) => {
 
 watch(
   () => isAuthenticated.value,
-  async (authed) => {
-    if (hasFetchedPosts.value) {
+  async (authed, previous) => {
+    if (!hasFetchedInitially.value) {
+      hasFetchedInitially.value = true
+      await fetchPosts(authed ? undefined : 'identityPool')
       return
     }
-    hasFetchedPosts.value = true
-    await fetchPosts(authed ? undefined : 'identityPool')
+
+    if (authed !== previous) {
+      await fetchPosts(authed ? undefined : 'identityPool')
+    }
   },
   { immediate: true },
 )
