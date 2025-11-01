@@ -95,14 +95,38 @@ export function usePosts() {
     const trimmed = content.trim()
     if (!trimmed) return
     await run(async () => {
-      if (!client) {
-        throw new Error('Amplify Data client is not available')
+      const normalizedDisplayName = displayName?.trim() || null
+      const headers: Record<string, string> = {}
+      let resolvedAuthMode = authMode
+
+      if (!resolvedAuthMode || resolvedAuthMode === 'userPool') {
+        const token = await resolveUserToken()
+        if (!token) {
+          throw new Error('認証情報を取得できませんでした')
+        }
+        headers.Authorization = `Bearer ${token}`
+        resolvedAuthMode = 'userPool'
       }
-      const response = await client!.models.Post.create(
-        { content: trimmed, displayName: displayName?.trim() || null },
-        { authMode },
-      )
-      sortAndStore([response.data, ...posts.value])
+      else if (!['identityPool', 'iam', 'apiKey'].includes(resolvedAuthMode)) {
+        throw new Error('サポートされていない認証モードです')
+      }
+
+      const bodyPayload: Record<string, unknown> = {
+        content: trimmed,
+        displayName: normalizedDisplayName,
+      }
+
+      if (resolvedAuthMode) {
+        bodyPayload.authMode = resolvedAuthMode
+      }
+
+      const response = await $fetch<PostModel>('/api/posts', {
+        method: 'POST',
+        headers: Object.keys(headers).length ? headers : undefined,
+        body: bodyPayload,
+      })
+
+      sortAndStore([response, ...posts.value])
     })
   }
 
