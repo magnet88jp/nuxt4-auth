@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { formatDisplayDate } from '../utils/datetime'
 
 const { user, isAuthenticated } = useAuth()
 const {
@@ -24,19 +25,7 @@ const editError = ref<string | null>(null)
 const editingId = ref<string | null>(null)
 const editDisplayName = ref('')
 const editContent = ref('')
-
-const formatTimestamp = (raw?: string | null) => {
-  if (!raw) return ''
-  const date = new Date(raw)
-  if (Number.isNaN(date.getTime())) return raw
-  return new Intl.DateTimeFormat('ja-JP', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
-}
+const hasFetchedPosts = ref(false)
 
 const resetComposer = () => {
   newContent.value = ''
@@ -99,6 +88,10 @@ const handleDelete = async (postId: string) => {
 watch(
   () => isAuthenticated.value,
   async (authed) => {
+    if (hasFetchedPosts.value) {
+      return
+    }
+    hasFetchedPosts.value = true
     await fetchPosts(authed ? undefined : 'identityPool')
   },
   { immediate: true },
@@ -220,7 +213,7 @@ watch(
             </span>
           </div>
           <time class="text-xs text-slate-500">
-            {{ formatTimestamp(post.updatedAt || post.createdAt) }}
+            {{ formatDisplayDate(post.updatedAt || post.createdAt) }}
           </time>
         </header>
 
