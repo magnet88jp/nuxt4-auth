@@ -32,7 +32,7 @@ export function usePosts() {
       const session = await fetchAuthSession()
       const token
         = session.tokens?.accessToken?.toString()
-        ?? session.tokens?.idToken?.toString()
+          ?? session.tokens?.idToken?.toString()
 
       return token ?? null
     }
