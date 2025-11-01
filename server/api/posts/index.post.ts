@@ -1,5 +1,5 @@
 import { defineEventHandler, readBody, createError } from 'h3'
-import { z } from 'zod'
+import { object, optional, picklist, safeParse } from 'valibot'
 import { generateClient } from 'aws-amplify/data/server'
 import type { Schema } from '~~/amplify/data/resource'
 import { amplifyConfig, runAmplifyApi } from '~~/server/utils/amplify'
@@ -16,21 +16,21 @@ type ModelResponse<T> = {
 
 const client = generateClient<Schema>({ config: amplifyConfig })
 
-const createPostSchema = z.object({
+const createPostSchema = object({
   content: contentSchema,
   displayName: displayNameSchema,
-  authMode: z.enum(['userPool', 'identityPool', 'iam', 'apiKey']).optional(),
+  authMode: optional(picklist(['userPool', 'identityPool', 'iam', 'apiKey'] as const)),
 })
 
 export default defineEventHandler(async (event) => {
-  const parsed = createPostSchema.safeParse(await readBody(event))
+  const parsed = safeParse(createPostSchema, await readBody(event))
 
   if (!parsed.success) {
-    const message = parsed.error.issues[0]?.message ?? 'Invalid request body'
+    const message = parsed.issues[0]?.message ?? 'Invalid request body'
     throw createError({ statusCode: 400, statusMessage: message })
   }
 
-  const { content, displayName, authMode } = parsed.data
+  const { content, displayName, authMode } = parsed.output
 
   const { amplifyAuthMode, authToken } = await resolveServerAuth(event, {
     requestedAuthMode: authMode,

@@ -1,5 +1,5 @@
 import { defineEventHandler, readBody, createError } from 'h3'
-import { z } from 'zod'
+import { object, safeParse } from 'valibot'
 import { generateClient } from 'aws-amplify/data/server'
 import type { Schema } from '~~/amplify/data/resource'
 import { amplifyConfig, runAmplifyApi } from '~~/server/utils/amplify'
@@ -17,7 +17,7 @@ type ModelResponse<T> = {
 
 const client = generateClient<Schema>({ config: amplifyConfig })
 
-const updatePostSchema = z.object({
+const updatePostSchema = object({
   content: contentSchema,
   displayName: displayNameSchema,
 })
@@ -28,13 +28,13 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Post id is required' })
   }
 
-  const parsed = updatePostSchema.safeParse(await readBody(event))
+  const parsed = safeParse(updatePostSchema, await readBody(event))
   if (!parsed.success) {
-    const message = parsed.error.issues[0]?.message ?? 'Invalid request body'
+    const message = parsed.issues[0]?.message ?? 'Invalid request body'
     throw createError({ statusCode: 400, statusMessage: message })
   }
 
-  const { content, displayName } = parsed.data
+  const { content, displayName } = parsed.output
 
   const { amplifyAuthMode, authToken, userSub } = await resolveServerAuth(event, {
     requireToken: true,
