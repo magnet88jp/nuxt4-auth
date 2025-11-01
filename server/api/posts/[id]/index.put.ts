@@ -1,8 +1,12 @@
-import { defineEventHandler, readBody, getHeader, createError } from 'h3'
+import { defineEventHandler, readBody, createError } from 'h3'
+import { object, safeParse } from 'valibot'
 import { generateClient } from 'aws-amplify/data/server'
 import type { Schema } from '~~/amplify/data/resource'
 import { amplifyConfig, runAmplifyApi } from '~~/server/utils/amplify'
-import { extractBearerToken, getCognitoConfig, verifyToken } from '~~/server/utils/cognito'
+import { collectErrors, toHttpError } from '~~/server/api/utils/api-error'
+import { resolveServerAuth } from '~~/server/api/utils/auth-mode'
+import { assertOwnership } from '~~/server/api/utils/ownership'
+import { contentSchema, displayNameSchema } from '~~/server/api/utils/post-schema'
 
 type PostModel = Schema['Post']['type']
 
@@ -13,38 +17,33 @@ type ModelResponse<T> = {
 
 const client = generateClient<Schema>({ config: amplifyConfig })
 
-function collectErrors(response?: ModelResponse<unknown>) {
-  return response?.errors?.map(entry => entry?.message).filter(Boolean).join('; ')
-}
+const updatePostSchema = object({
+  content: contentSchema,
+  displayName: displayNameSchema,
+})
 
 export default defineEventHandler(async (event) => {
-  getCognitoConfig()
-
-  const token = extractBearerToken(getHeader(event, 'authorization'))
-  if (!token) {
-    throw createError({ statusCode: 401, statusMessage: 'Missing bearer token' })
-  }
-
-  const payload = await verifyToken(token)
-  const userSub = typeof payload.sub === 'string' ? payload.sub : null
-  if (!userSub) {
-    throw createError({ statusCode: 401, statusMessage: 'Token subject is missing' })
-  }
-
   const id = event.context.params?.id
   if (!id) {
     throw createError({ statusCode: 400, statusMessage: 'Post id is required' })
   }
 
-  const body = await readBody<{ content?: string, displayName?: string | null }>(event)
-  const content = (body?.content ?? '').trim()
-  if (!content) {
-    throw createError({ statusCode: 400, statusMessage: 'content is required' })
+  const parsed = safeParse(updatePostSchema, await readBody(event))
+  if (!parsed.success) {
+    const message = parsed.issues[0]?.message ?? 'Invalid request body'
+    throw createError({ statusCode: 400, statusMessage: message })
   }
 
-  const displayNameInput = body?.displayName
-  const displayName = typeof displayNameInput === 'string' ? displayNameInput.trim() : displayNameInput ?? null
-  const normalizedDisplayName = displayName === '' ? null : displayName
+  const { content, displayName } = parsed.output
+
+  const { amplifyAuthMode, authToken, userSub } = await resolveServerAuth(event, {
+    requireToken: true,
+    defaultAuthMode: 'userPool',
+  })
+
+  const authContext = authToken
+    ? { authMode: amplifyAuthMode, authToken }
+    : { authMode: amplifyAuthMode }
 
   let existing: ModelResponse<PostModel>
   try {
@@ -52,18 +51,19 @@ export default defineEventHandler(async (event) => {
       client.models.Post.get(
         context,
         { id },
-        { authMode: 'userPool', authToken: token },
+        authContext,
       ),
     ) as ModelResponse<PostModel>
   }
   catch (error) {
+    const message = error instanceof Error ? error.message : ''
     console.error('[Posts] Failed to load post', error)
-    throw createError({ statusCode: 500, statusMessage: 'Failed to load post' })
+    throw toHttpError(message, { statusCode: 500, statusMessage: 'Failed to load post' })
   }
 
   const existingErrors = collectErrors(existing)
   if (existingErrors) {
-    throw createError({ statusCode: 500, statusMessage: existingErrors })
+    throw toHttpError(existingErrors, { statusCode: 500, statusMessage: 'Failed to load post' })
   }
 
   const post = existing.data
@@ -71,9 +71,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: 'Post not found' })
   }
 
-  if (post.owner && post.owner !== userSub) {
-    throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
-  }
+  assertOwnership(post.owner, userSub)
 
   let updated: ModelResponse<PostModel>
   try {
@@ -83,23 +81,21 @@ export default defineEventHandler(async (event) => {
         {
           id,
           content,
-          displayName: normalizedDisplayName,
+          displayName,
         },
-        { authMode: 'userPool', authToken: token },
+        authContext,
       ),
     ) as ModelResponse<PostModel>
   }
   catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to update post'
-    const isForbidden = /not authorized|unauthorized|forbidden/i.test(message)
+    const message = error instanceof Error ? error.message : ''
     console.error('[Posts] Failed to update post', error)
-    throw createError({ statusCode: isForbidden ? 403 : 500, statusMessage: isForbidden ? 'Forbidden' : 'Failed to update post' })
+    throw toHttpError(message, { statusCode: 500, statusMessage: 'Failed to update post' })
   }
 
   const updateErrors = collectErrors(updated)
   if (updateErrors) {
-    const isForbidden = /not authorized|unauthorized|forbidden/i.test(updateErrors)
-    throw createError({ statusCode: isForbidden ? 403 : 500, statusMessage: updateErrors })
+    throw toHttpError(updateErrors, { statusCode: 500, statusMessage: 'Failed to update post' })
   }
 
   if (!updated.data) {

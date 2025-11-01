@@ -1,9 +1,10 @@
 import { ref } from 'vue'
 import { fetchAuthSession } from 'aws-amplify/auth'
 import type { Schema } from '~~/amplify/data/resource'
+import { toUnixTime } from '../utils/datetime'
 
 type PostModel = Schema['Post']['type']
-type AuthMode = 'userPool' | 'identityPool' | 'apiKey' | 'iam' | undefined
+type AuthMode = 'userPool' | 'identityPool' | 'apiKey' | undefined
 
 type CreatePostInput = {
   content: string
@@ -56,32 +57,43 @@ export function usePosts() {
   }
 
   const sortAndStore = (items: PostModel[]) => {
-    const getTimestamp = (item: PostModel) => item.updatedAt ?? item.createdAt ?? ''
-    posts.value = [...items].sort((a, b) => getTimestamp(b).localeCompare(getTimestamp(a)))
+    const getSortTime = (item: PostModel) => toUnixTime(item.updatedAt ?? item.createdAt ?? null)
+    posts.value = [...items].sort((a, b) => getSortTime(b) - getSortTime(a))
+  }
+
+  const buildAuthHeaders = async (preferred?: AuthMode) => {
+    let resolvedAuthMode = preferred
+    const headers: Record<string, string> = {}
+
+    if (!resolvedAuthMode || resolvedAuthMode === 'userPool') {
+      const token = await resolveUserToken()
+      if (token) {
+        headers.Authorization = `Bearer ${token}`
+        resolvedAuthMode = 'userPool'
+      }
+      else if (resolvedAuthMode === 'userPool') {
+        throw new Error('認証情報を取得できませんでした')
+      }
+      else {
+        resolvedAuthMode = 'identityPool'
+      }
+    }
+    else if (resolvedAuthMode !== 'identityPool' && resolvedAuthMode !== 'apiKey') {
+      throw new Error('サポートされていない認証モードです')
+    }
+
+    return {
+      headers: Object.keys(headers).length ? headers : undefined,
+      authMode: resolvedAuthMode,
+    }
   }
 
   const fetchPosts = async (authMode?: AuthMode) => {
     await run(async () => {
-      let resolvedAuthMode = authMode
-      const headers: Record<string, string> = {}
-
-      if (resolvedAuthMode !== 'identityPool') {
-        const token = await resolveUserToken()
-        if (token) {
-          headers.Authorization = `Bearer ${token}`
-          resolvedAuthMode = resolvedAuthMode ?? 'userPool'
-        }
-        else if (resolvedAuthMode === 'userPool') {
-          throw new Error('認証情報を取得できませんでした')
-        }
-        else if (!resolvedAuthMode) {
-          resolvedAuthMode = 'identityPool'
-        }
-      }
-
+      const { headers, authMode: resolvedAuthMode } = await buildAuthHeaders(authMode)
       const response = await $fetch<PostModel[]>('/api/posts', {
-        query: resolvedAuthMode ? { authMode: resolvedAuthMode } : undefined,
-        headers: Object.keys(headers).length ? headers : undefined,
+        query: resolvedAuthMode && resolvedAuthMode !== 'userPool' ? { authMode: resolvedAuthMode } : undefined,
+        headers,
       })
 
       sortAndStore(response)
@@ -93,33 +105,19 @@ export function usePosts() {
     if (!trimmed) return
     await run(async () => {
       const normalizedDisplayName = displayName?.trim() || null
-      const headers: Record<string, string> = {}
-      let resolvedAuthMode = authMode
-
-      if (!resolvedAuthMode || resolvedAuthMode === 'userPool') {
-        const token = await resolveUserToken()
-        if (!token) {
-          throw new Error('認証情報を取得できませんでした')
-        }
-        headers.Authorization = `Bearer ${token}`
-        resolvedAuthMode = 'userPool'
-      }
-      else if (!['identityPool', 'iam', 'apiKey'].includes(resolvedAuthMode)) {
-        throw new Error('サポートされていない認証モードです')
-      }
-
+      const { headers, authMode: resolvedAuthMode } = await buildAuthHeaders(authMode)
       const bodyPayload: Record<string, unknown> = {
         content: trimmed,
         displayName: normalizedDisplayName,
       }
 
-      if (resolvedAuthMode) {
+      if (resolvedAuthMode && resolvedAuthMode !== 'userPool') {
         bodyPayload.authMode = resolvedAuthMode
       }
 
       const response = await $fetch<PostModel>('/api/posts', {
         method: 'POST',
-        headers: Object.keys(headers).length ? headers : undefined,
+        headers,
         body: bodyPayload,
       })
 
@@ -133,16 +131,10 @@ export function usePosts() {
     const normalizedDisplayName = displayName?.trim() || null
 
     await run(async () => {
-      const token = await resolveUserToken()
-      if (!token) {
-        throw new Error('認証情報を取得できませんでした')
-      }
-
+      const { headers } = await buildAuthHeaders('userPool')
       const response = await $fetch<PostModel>(`/api/posts/${id}`, {
         method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
         body: {
           content: trimmed,
           displayName: normalizedDisplayName,
@@ -156,16 +148,10 @@ export function usePosts() {
 
   const deletePost = async (post: PostModel) => {
     await run(async () => {
-      const token = await resolveUserToken()
-      if (!token) {
-        throw new Error('認証情報を取得できませんでした')
-      }
-
+      const { headers } = await buildAuthHeaders('userPool')
       await $fetch(`/api/posts/${post.id}`, {
         method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers,
       })
       posts.value = posts.value.filter(item => item.id !== post.id)
     })
