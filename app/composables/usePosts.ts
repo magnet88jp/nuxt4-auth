@@ -1,9 +1,6 @@
 import { ref } from 'vue'
-import { generateClient } from 'aws-amplify/data'
 import { fetchAuthSession } from 'aws-amplify/auth'
 import type { Schema } from '~~/amplify/data/resource'
-
-const client = import.meta.client ? generateClient<Schema>() : null
 
 type PostModel = Schema['Post']['type']
 type AuthMode = 'userPool' | 'identityPool' | 'apiKey' | 'iam' | undefined
@@ -159,10 +156,17 @@ export function usePosts() {
 
   const deletePost = async (post: PostModel) => {
     await run(async () => {
-      if (!client) {
-        throw new Error('Amplify Data client is not available')
+      const token = await resolveUserToken()
+      if (!token) {
+        throw new Error('認証情報を取得できませんでした')
       }
-      await client!.models.Post.delete({ id: post.id })
+
+      await $fetch(`/api/posts/${post.id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
       posts.value = posts.value.filter(item => item.id !== post.id)
     })
   }
